@@ -1,0 +1,9 @@
+# Resume Formatter Dependencies
+pdfplumber>=0.10.0
+python-docx>=1.0.0
+docx>=0.2.4
+
+# Slack Bot Dependencies
+slack-bolt>=1.18.0
+slack-sdk>=3.21.0
+requests>=2.28.0

@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+
+# Output files
+output/
+input/*.pdf
+input/*.docx
+
+# Environment & secrets
+.env
+*.env
+.env.local
+
+# Temp files
+temp_resume_data.json
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
