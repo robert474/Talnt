@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talnt Document Generator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            opacity: 0.8;
+        }
+
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .mode-btn {
+            padding: 12px 30px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: transparent;
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .mode-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .mode-btn.active {
+            background: white;
+            color: #1a1a2e;
+            border-color: white;
+            font-weight: 600;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            font-size: 1.2rem;
+            color: #1a1a2e;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        input, textarea, select {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #1a1a2e;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .totals-preview {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .totals-row:last-child {
+            border-bottom: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .totals-value {
+            color: #2e7d32;
+            font-weight: 600;
+        }
+
+        .file-upload {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .file-upload:hover {
+            border-color: #1a1a2e;
+            background: #f8f9fa;
+        }
+
+        .file-upload.has-file {
+            border-color: #2e7d32;
+            background: #e8f5e9;
+        }
+
+        .file-upload input {
+            display: none;
+        }
+
+        .file-upload-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .tl-dr {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border-left: 4px solid #2e7d32;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .tl-dr h3 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+
+        .tl-dr .amount {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1b5e20;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #ddd;
+            border-top-color: #1a1a2e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Resume-only mode styles */
+        .resume-info {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 4px solid #1976d2;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .resume-info h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .resume-info p {
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Talnt Document Generator</h1>
+        <p id="header-subtitle">Create formatted proposals with pricing and resumes</p>
+        <div class="mode-selector">
+            <button type="button" class="mode-btn" id="mode-resume" onclick="setMode('resume')">Resume Formatter</button>
+            <button type="button" class="mode-btn active" id="mode-rfq" onclick="setMode('rfq')">RFQ Proposal</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Resume-only info banner -->
+        <div class="resume-info hidden" id="resume-info">
+            <h3>Resume Formatter</h3>
+            <p>Upload a resume (PDF or DOCX) to format it with company branding, keyword highlighting, and standardized layout.</p>
+        </div>
+
+        <!-- RFQ Project Total banner -->
+        <div class="tl-dr" id="rfq-banner">
+            <h3>Project Total</h3>
+            <div class="amount" id="tldr-total">$0</div>
+            <p id="tldr-summary">Fill in the form below to calculate</p>
+        </div>
+
+        <!-- Resume-only form -->
+        <form id="resume-form" action="/format-resume" method="POST" enctype="multipart/form-data" class="hidden">
+            <div class="card">
+                <h2>Upload Resume</h2>
+                <div class="file-upload" id="resume-file-upload">
+                    <input type="file" id="resume-file" name="resume" accept=".pdf,.docx" required>
+                    <div class="file-upload-icon">📄</div>
+                    <p><strong>Click to upload</strong> or drag and drop</p>
+                    <p style="font-size: 0.9rem; color: #666;">PDF or DOCX file</p>
+                </div>
+                <p id="resume-file-name" style="margin-top: 10px; color: #2e7d32; display: none;"></p>
+            </div>
+
+            <div class="card">
+                <div class="loading" id="resume-loading">
+                    <div class="spinner"></div>
+                    <p>Formatting resume...</p>
+                </div>
+                <button type="submit" class="btn" id="resume-submit-btn">Format Resume</button>
+            </div>
+        </form>
+
+        <!-- RFQ Proposal form -->
+        <form id="rfq-form" action="/generate" method="POST" enctype="multipart/form-data">
+            <!-- Staff Information -->
+            <div class="card">
+                <h2>Staff Information</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="staff_name">Staff Name *</label>
+                        <input type="text" id="staff_name" name="staff_name" required placeholder="e.g., John Smith">
+                    </div>
+                    <div class="form-group">
+                        <label for="position">Position *</label>
+                        <input type="text" id="position" name="position" required placeholder="e.g., Construction Manager">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="duration">Duration (Months) *</label>
+                        <input type="number" id="duration" name="duration" required placeholder="e.g., 12" step="0.5" min="0.5">
+                    </div>
+                    <div class="form-group">
+                        <label for="hourly_rate">Hourly Rate ($) *</label>
+                        <input type="number" id="hourly_rate" name="hourly_rate" required placeholder="e.g., 200" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="commitment">Commitment (%)</label>
+                        <input type="number" id="commitment" name="commitment" value="100" min="0" max="100">
+                    </div>
+                </div>
+
+                <div class="totals-preview">
+                    <div class="totals-row">
+                        <span>Monthly Cost</span>
+                        <span class="totals-value" id="monthly-cost">$0</span>
+                    </div>
+                    <div class="totals-row">
+                        <span>Project Total</span>
+                        <span class="totals-value" id="project-total">$0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Details -->
+            <div class="card">
+                <h2>Project Details</h2>
+                <div class="form-group">
+                    <label for="project_experience">Detailed Project Experience *</label>
+                    <textarea id="project_experience" name="project_experience" required
+                        placeholder="Describe the candidate's relevant experience for this project..."></textarea>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label for="project_summary">Project Summary (bullet points)</label>
+                    <textarea id="project_summary" name="project_summary"
+                        placeholder="- Project 1: Description&#10;- Project 2: Description&#10;- Project 3: Description"></textarea>
+                </div>
+            </div>
+
+            <!-- Expenses -->
+            <div class="card">
+                <h2>Expenses (Optional)</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="expense_type">Type</label>
+                        <select id="expense_type" name="expense_type">
+                            <option value="">None</option>
+                            <option value="Per Diem">Per Diem</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Housing">Housing</option>
+                            <option value="Per Diem + Travel">Per Diem + Travel</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="expense_desc">Description</label>
+                        <input type="text" id="expense_desc" name="expense_desc" placeholder="e.g., Monthly per diem allowance">
+                    </div>
+                    <div class="form-group">
+                        <label for="expense_monthly_amt">Monthly Amount ($)</label>
+                        <input type="number" id="expense_monthly_amt" name="expense_monthly_amt" placeholder="e.g., 2520" min="0">
+                    </div>
+                </div>
+                <div class="totals-preview" id="expense-totals" style="display: none;">
+                    <div class="totals-row">
+                        <span>Expense Monthly</span>
+                        <span class="totals-value" id="expense-monthly-display">$0</span>
+                    </div>
+                    <div class="totals-row">
+                        <span>Expense Total</span>
+                        <span class="totals-value" id="expense-total-display">$0</span>
+                    </div>
+                </div>
+                <input type="hidden" id="expense_monthly" name="expense_monthly" value="N/A">
+                <input type="hidden" id="expense_total" name="expense_total" value="N/A">
+            </div>
+
+            <!-- Resume Upload -->
+            <div class="card">
+                <h2>Resume Upload</h2>
+                <div class="file-upload" id="file-upload">
+                    <input type="file" id="resume" name="resume" accept=".pdf,.docx">
+                    <div class="file-upload-icon">📄</div>
+                    <p><strong>Click to upload</strong> or drag and drop</p>
+                    <p style="font-size: 0.9rem; color: #666;">PDF or DOCX (will be auto-formatted)</p>
+                </div>
+                <p id="file-name" style="margin-top: 10px; color: #2e7d32; display: none;"></p>
+            </div>
+
+            <!-- Submit -->
+            <div class="card">
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Generating proposal...</p>
+                </div>
+                <button type="submit" class="btn" id="submit-btn">Generate Proposal</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let currentMode = 'rfq';
+
+        function setMode(mode) {
+            currentMode = mode;
+            const rfqForm = document.getElementById('rfq-form');
+            const resumeForm = document.getElementById('resume-form');
+            const rfqBanner = document.getElementById('rfq-banner');
+            const resumeInfo = document.getElementById('resume-info');
+            const modeRfq = document.getElementById('mode-rfq');
+            const modeResume = document.getElementById('mode-resume');
+            const subtitle = document.getElementById('header-subtitle');
+
+            if (mode === 'resume') {
+                rfqForm.classList.add('hidden');
+                resumeForm.classList.remove('hidden');
+                rfqBanner.classList.add('hidden');
+                resumeInfo.classList.remove('hidden');
+                modeRfq.classList.remove('active');
+                modeResume.classList.add('active');
+                subtitle.textContent = 'Format resumes with company branding';
+            } else {
+                rfqForm.classList.remove('hidden');
+                resumeForm.classList.add('hidden');
+                rfqBanner.classList.remove('hidden');
+                resumeInfo.classList.add('hidden');
+                modeRfq.classList.add('active');
+                modeResume.classList.remove('active');
+                subtitle.textContent = 'Create formatted proposals with pricing and resumes';
+            }
+        }
+
+        // Resume-only file upload handling
+        const resumeFileUpload = document.getElementById('resume-file-upload');
+        const resumeFileInput = document.getElementById('resume-file');
+        const resumeFileName = document.getElementById('resume-file-name');
+
+        resumeFileUpload.addEventListener('click', () => resumeFileInput.click());
+
+        resumeFileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            resumeFileUpload.style.borderColor = '#1a1a2e';
+        });
+
+        resumeFileUpload.addEventListener('dragleave', () => {
+            resumeFileUpload.style.borderColor = '#ddd';
+        });
+
+        resumeFileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            resumeFileUpload.style.borderColor = '#ddd';
+            if (e.dataTransfer.files.length) {
+                resumeFileInput.files = e.dataTransfer.files;
+                updateResumeFileName();
+            }
+        });
+
+        resumeFileInput.addEventListener('change', updateResumeFileName);
+
+        function updateResumeFileName() {
+            if (resumeFileInput.files.length) {
+                resumeFileName.textContent = '✓ ' + resumeFileInput.files[0].name;
+                resumeFileName.style.display = 'block';
+                resumeFileUpload.classList.add('has-file');
+            }
+        }
+
+        // Resume form submission
+        const resumeForm = document.getElementById('resume-form');
+        const resumeLoading = document.getElementById('resume-loading');
+        const resumeSubmitBtn = document.getElementById('resume-submit-btn');
+
+        resumeForm.addEventListener('submit', function() {
+            resumeLoading.classList.add('show');
+            resumeSubmitBtn.disabled = true;
+            resumeSubmitBtn.textContent = 'Formatting...';
+        });
+
+        // RFQ file upload handling
+        const fileUpload = document.getElementById('file-upload');
+        const fileInput = document.getElementById('resume');
+        const fileName = document.getElementById('file-name');
+
+        fileUpload.addEventListener('click', () => fileInput.click());
+
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.style.borderColor = '#1a1a2e';
+        });
+
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.style.borderColor = '#ddd';
+        });
+
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.style.borderColor = '#ddd';
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                updateFileName();
+            }
+        });
+
+        fileInput.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            if (fileInput.files.length) {
+                fileName.textContent = '✓ ' + fileInput.files[0].name;
+                fileName.style.display = 'block';
+                fileUpload.classList.add('has-file');
+            }
+        }
+
+        // Calculate totals
+        const hourlyRate = document.getElementById('hourly_rate');
+        const duration = document.getElementById('duration');
+        const commitment = document.getElementById('commitment');
+        const monthlyDisplay = document.getElementById('monthly-cost');
+        const totalDisplay = document.getElementById('project-total');
+        const tldrTotal = document.getElementById('tldr-total');
+        const tldrSummary = document.getElementById('tldr-summary');
+        const staffName = document.getElementById('staff_name');
+        const position = document.getElementById('position');
+
+        // Expense fields
+        const expenseType = document.getElementById('expense_type');
+        const expenseMonthlyAmt = document.getElementById('expense_monthly_amt');
+        const expenseTotalsDiv = document.getElementById('expense-totals');
+        const expenseMonthlyDisplay = document.getElementById('expense-monthly-display');
+        const expenseTotalDisplay = document.getElementById('expense-total-display');
+        const expenseMonthlyHidden = document.getElementById('expense_monthly');
+        const expenseTotalHidden = document.getElementById('expense_total');
+
+        function calculateTotals() {
+            const hr = parseFloat(hourlyRate.value) || 0;
+            const dur = parseFloat(duration.value) || 0;
+            const comm = parseFloat(commitment.value) || 100;
+
+            const hoursPerMonth = 173.33;
+            const staffMonthly = hr * hoursPerMonth * (comm / 100);
+            const staffTotal = staffMonthly * dur;
+
+            // Calculate expense totals
+            const expMonthly = parseFloat(expenseMonthlyAmt.value) || 0;
+            const expTotal = expMonthly * dur;
+
+            // Show/hide expense totals
+            if (expMonthly > 0) {
+                expenseTotalsDiv.style.display = 'block';
+                expenseMonthlyDisplay.textContent = '$' + expMonthly.toLocaleString('en-US', {maximumFractionDigits: 0});
+                expenseTotalDisplay.textContent = '$' + expTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
+                expenseMonthlyHidden.value = '$' + expMonthly.toLocaleString('en-US', {maximumFractionDigits: 0});
+                expenseTotalHidden.value = '$' + expTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
+            } else {
+                expenseTotalsDiv.style.display = 'none';
+                expenseMonthlyHidden.value = 'N/A';
+                expenseTotalHidden.value = 'N/A';
+            }
+
+            // Combined totals (staff + expenses)
+            const combinedMonthly = staffMonthly + expMonthly;
+            const combinedTotal = staffTotal + expTotal;
+
+            monthlyDisplay.textContent = '$' + staffMonthly.toLocaleString('en-US', {maximumFractionDigits: 0});
+            totalDisplay.textContent = '$' + staffTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
+            tldrTotal.textContent = '$' + combinedTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
+
+            const name = staffName.value || 'Candidate';
+            const pos = position.value || 'Position';
+            let summary = `${name} | ${pos} | ${dur || 0} months @ $${hr || 0}/hr`;
+            if (expMonthly > 0) {
+                summary += ` + $${expMonthly}/mo expenses`;
+            }
+            tldrSummary.textContent = summary;
+        }
+
+        hourlyRate.addEventListener('input', calculateTotals);
+        duration.addEventListener('input', calculateTotals);
+        commitment.addEventListener('input', calculateTotals);
+        staffName.addEventListener('input', calculateTotals);
+        position.addEventListener('input', calculateTotals);
+        expenseMonthlyAmt.addEventListener('input', calculateTotals);
+        expenseType.addEventListener('change', calculateTotals);
+
+        // Form submission
+        const form = document.getElementById('rfq-form');
+        const loading = document.getElementById('loading');
+        const submitBtn = document.getElementById('submit-btn');
+
+        form.addEventListener('submit', function() {
+            loading.classList.add('show');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Generating...';
+        });
+    </script>
+</body>
+</html>

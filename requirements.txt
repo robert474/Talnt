@@ -7,3 +7,8 @@ docx>=0.2.4
 slack-bolt>=1.18.0
 slack-sdk>=3.21.0
 requests>=2.28.0
+
+# RFQ Proposal Web App
+flask>=3.0.0
+werkzeug>=3.0.0
+gunicorn>=21.0.0
