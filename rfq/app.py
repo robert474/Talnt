@@ -198,7 +198,7 @@ def generate():
                     print(f"Resume formatting error: {e}")
 
         # Generate the proposal DOCX
-        from generate_rfq import generate_rfq_proposal
+        from rfq.generate_rfq import generate_rfq_proposal
 
         output_path = SCRIPT_DIR / 'output' / f"RFQ_Proposal_{staff_name.replace(' ', '_')}.docx"
         output_path.parent.mkdir(exist_ok=True)
