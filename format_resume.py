@@ -141,7 +141,17 @@ def simple_parse_resume(resume_text):
 
     # Date pattern to detect job header lines - handles multiple formats:
     # "Feb 2024 – Present", "Jan 2022 to present", "2023 - 2024", "2015 - Present"
-    date_pattern = r'(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?\d{4}\s*[-–—to\s]+\s*(?:Present|present|Current|current|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?\d{0,4}'
+    # "3/10/25 to Present", "03/05/20 to 2/20/25" (MM/DD/YY format)
+    # "04/2001 to 02/2008" (MM/YYYY format)
+    # "04/2012 to 4/20/18" (mixed MM/YYYY to M/DD/YY format)
+    # For slash dates, require "to" or dash between dates (not just any number)
+    date_pattern_month = r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}\s*[-–—to\s]+\s*(?:Present|present|Current|current|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4})'
+    date_pattern_year = r'\d{4}\s*[-–—to\s]+\s*(?:Present|present|Current|current|\d{4})'
+    date_pattern_slash_full = r'\d{1,2}/\d{1,2}/\d{2,4}\s*(?:to|[-–—])\s*(?:Present|present|Current|current|\d{1,2}/\d{1,2}/\d{2,4})'
+    date_pattern_slash_my = r'\d{1,2}/\d{4}\s*(?:to|[-–—])\s*(?:Present|present|Current|current|\d{1,2}/\d{4})'
+    # Mixed: MM/YYYY to M/DD/YY or vice versa - use a general slash pattern
+    date_pattern_slash_any = r'\d{1,2}/\d{2,4}\s*(?:to|[-–—])\s*(?:Present|present|Current|current|\d{1,2}/\d{1,2}/\d{2,4})'
+    date_pattern = f'{date_pattern_month}|{date_pattern_slash_full}|{date_pattern_slash_my}|{date_pattern_slash_any}|{date_pattern_year}'
 
     # Summary - extract until we hit a section header or skills/experience
     summary_patterns = [
@@ -241,7 +251,7 @@ def simple_parse_resume(resume_text):
     # Employment History - detect multiple formats
     # Some resumes have no header, jobs start after Skills section with $ or company names
     exp_patterns = [
-        r'(?:PROFESSIONAL\s+EXPERIENCE|EMPLOYMENT\s+HISTORY|WORK\s+EXPERIENCE|EXPERIENCE)\s*\n+(.*?)(?=\n\s*(?:EDUCATION|SELECTED|CORE\s+SKILLS|CERTIFICATIONS?)|\Z)',
+        r'(?:PROFESSIONAL\s+EXPERIENCE|EMPLOYMENT\s+HISTORY|WORK\s+HISTORY|WORK\s+EXPERIENCE|EXPERIENCE)\s*\n+(.*?)(?=\n\s*(?:EDUCATION|SELECTED|CORE\s+SKILLS|CERTIFICATIONS?)|\Z)',
     ]
 
     # First try standard patterns
@@ -357,7 +367,11 @@ def simple_parse_resume(resume_text):
                         # Check if it has separators (|, –, —) that would indicate title | location format
                         has_separator_before_date = '|' in before_date or ' – ' in before_date or ' — ' in before_date
 
-                    if next_has_date and has_separator_before_date:
+                    # Only use this format when there's a PIPE separator (not dash)
+                    # Dash is used for "Company – Address" format, not "Title | Location"
+                    has_pipe_separator = '|' in before_date if next_has_date else False
+
+                    if next_has_date and has_pipe_separator:
                         is_company_line = True
                         # This line is company, next line is title|location|dates
                         if current_job:
@@ -398,21 +412,33 @@ def simple_parse_resume(resume_text):
                     if i + 1 < len(exp_lines):
                         next_line = exp_lines[i + 1].strip()
                         next_has_date = re.search(date_pattern, next_line, re.IGNORECASE)
-                        # Next line has date but NO pipe (just "Company Date" format)
+                        # Next line has date (Company – Address Date format or Company Date format)
                         if next_has_date and '|' not in next_line:
-                            # This line is title, next is company+date
+                            # This line is title, next is company+location+date
                             if current_job:
                                 jobs.append(current_job)
 
                             title = line
                             dates_match = re.search(date_pattern, next_line, re.IGNORECASE)
                             dates = dates_match.group(0).strip() if dates_match else ""
-                            company = re.sub(date_pattern, '', next_line, flags=re.IGNORECASE).strip().rstrip(',').strip()
+
+                            # Remove dates from line to get company info
+                            company_part = re.sub(date_pattern, '', next_line, flags=re.IGNORECASE).strip().rstrip(',').strip()
+
+                            # Check if company has location separated by dash (Company – Address format)
+                            # e.g., "AGL Fuel Transportations – 12215 Telegraph Rd Santa Fe Springs, CA 90670"
+                            company = company_part
+                            location = ""
+                            if ' – ' in company_part or ' - ' in company_part:
+                                dash_parts = re.split(r'\s*[–-]\s*', company_part, 1)
+                                if len(dash_parts) == 2:
+                                    company = dash_parts[0].strip()
+                                    location = dash_parts[1].strip()
 
                             current_job = {
                                 "company": company,
                                 "title": title,
-                                "location": "",
+                                "location": location,
                                 "dates": dates,
                                 "project_details": "",
                                 "bullets": []
@@ -458,47 +484,77 @@ def simple_parse_resume(resume_text):
                     "bullets": []
                 }
 
-            # Format 4: "Company Dates" on one line
-            # Could have "Title" on previous line OR on next line (or no title)
+            # Format 4: "Title Dates" or "Company Dates" on one line
+            # Need to determine if text before date is title or company
             elif has_date and not line.startswith('•'):
                 if current_job:
                     jobs.append(current_job)
 
                 dates_match = re.search(date_pattern, line, re.IGNORECASE)
                 dates = dates_match.group(0) if dates_match else ""
-                company = re.sub(date_pattern, '', line, flags=re.IGNORECASE).strip().rstrip(',').strip()
+                text_before_date = re.sub(date_pattern, '', line, flags=re.IGNORECASE).strip().rstrip(',').strip()
 
                 title = ""
-                # Check if previous line was a title (non-bullet, short, no date)
-                if i > 0:
-                    prev_line = exp_lines[i - 1].strip()
-                    prev_has_date = re.search(date_pattern, prev_line, re.IGNORECASE)
-                    # If previous line is short, not a bullet, and doesn't have date
-                    if (prev_line and not prev_line.startswith('•') and
-                        not prev_has_date and len(prev_line) < 60 and
-                        not prev_line.endswith('.') and not prev_line.endswith(',')):
-                        # Could be a title (e.g., "Master Scheduler (C)")
-                        title = prev_line
-                        # Remove this from previous job's bullets if it was added there
-                        if jobs and jobs[-1].get('bullets'):
-                            last_bullet = jobs[-1]['bullets'][-1] if jobs[-1]['bullets'] else ""
-                            if title in last_bullet:
-                                # Don't use as title, it was part of a bullet
-                                title = ""
-                            elif last_bullet == title:
-                                jobs[-1]['bullets'].pop()
+                company = ""
+                location = ""
 
-                # If no title from previous line, check next line
-                if not title and i + 1 < len(exp_lines):
+                # Check next line to determine if text_before_date is title or company
+                # If next line looks like a company (has Inc., LLC, Corp, Company, or dash with address)
+                # then text_before_date is the title
+                next_line = ""
+                if i + 1 < len(exp_lines):
                     next_line = exp_lines[i + 1].strip()
-                    if not next_line.startswith('•') and not re.search(date_pattern, next_line, re.IGNORECASE):
-                        title = next_line
-                        i += 1
+
+                company_indicators = ['Inc.', 'Inc,', 'LLC', 'Corp', 'Company', 'Ltd', 'L.L.C', 'Corporation', 'Center', 'Administrators', 'Airlines']
+                # Check if next line looks like a company name with address
+                # Patterns: "Company – City, State" or "Company – Address" or company indicators
+                next_looks_like_company = (
+                    next_line and
+                    not next_line.startswith('•') and
+                    not re.search(date_pattern, next_line, re.IGNORECASE) and
+                    (any(ind in next_line for ind in company_indicators) or
+                     (' – ' in next_line and re.search(r',\s*[A-Z]{2}', next_line)) or  # Has dash and "City, ST" pattern
+                     (' - ' in next_line and re.search(r',\s*[A-Z]{2}', next_line)) or
+                     (' – ' in next_line and re.search(r'\d{5}', next_line)))  # Has dash and ZIP code
+                )
+
+                if next_looks_like_company:
+                    # Current line has title+date, next line has company+address
+                    title = text_before_date
+                    company_line = next_line
+                    # Parse company and location from next line
+                    if ' – ' in company_line or ' - ' in company_line:
+                        dash_parts = re.split(r'\s*[–-]\s*', company_line, maxsplit=1)
+                        if len(dash_parts) == 2:
+                            company = dash_parts[0].strip()
+                            location = dash_parts[1].strip()
+                        else:
+                            company = company_line
+                    else:
+                        company = company_line
+                    i += 1  # Skip next line since we consumed it
+                else:
+                    # Current line has company+date (traditional format)
+                    company = text_before_date
+                    # Check if previous line was a title
+                    if i > 0:
+                        prev_line = exp_lines[i - 1].strip()
+                        prev_has_date = re.search(date_pattern, prev_line, re.IGNORECASE)
+                        if (prev_line and not prev_line.startswith('•') and
+                            not prev_has_date and len(prev_line) < 60 and
+                            not prev_line.endswith('.') and not prev_line.endswith(',')):
+                            title = prev_line
+                            if jobs and jobs[-1].get('bullets'):
+                                last_bullet = jobs[-1]['bullets'][-1] if jobs[-1]['bullets'] else ""
+                                if title in last_bullet:
+                                    title = ""
+                                elif last_bullet == title:
+                                    jobs[-1]['bullets'].pop()
 
                 current_job = {
                     "company": company,
                     "title": title,
-                    "location": "",
+                    "location": location,
                     "dates": dates,
                     "project_details": "",
                     "bullets": []
@@ -733,244 +789,17 @@ Return ONLY the JSON, no markdown, no explanation, no other text."""
 
 def generate_formatted_docx(parsed_data, output_path):
     """Generate formatted DOCX with company template"""
-    
-    # We'll use Node.js for docx generation since it's more reliable
+
+    # We'll use the existing Node.js script for docx generation
     # Create a temporary JSON file with the parsed data
     json_path = SCRIPT_DIR / "temp_resume_data.json"
     with open(json_path, 'w') as f:
         json.dump(parsed_data, f, indent=2)
-    
-    # Create Node.js script
+
+    # Use the existing generate_docx.js script (which supports brand selection)
     node_script = SCRIPT_DIR / "generate_docx.js"
-    
-    node_code = """
-const { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, convertInchesToTwip } = require('docx');
-const fs = require('fs');
-const path = require('path');
 
-// Read the parsed resume data
-const dataPath = process.argv[2];
-const outputPath = process.argv[3];
-const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-
-// Keywords to highlight
-const highlightKeywords = ['AWS', 'Amazon', 'Google', 'Data Center', 'Microsoft', 'data center'];
-
-function highlightText(text, fontSize = 18) {
-  const textRuns = [];
-  let remaining = text;
-  let foundKeyword = false;
-  
-  for (const keyword of highlightKeywords) {
-    const regex = new RegExp(`(${keyword})`, 'gi');
-    const parts = remaining.split(regex);
-    
-    if (parts.length > 1) {
-      foundKeyword = true;
-      const runs = [];
-      for (let i = 0; i < parts.length; i++) {
-        if (parts[i]) {
-          const isBold = parts[i].toLowerCase() === keyword.toLowerCase();
-          runs.push(new TextRun({ text: parts[i], bold: isBold, size: fontSize, font: "Arial" }));
-        }
-      }
-      return runs;
-    }
-  }
-  
-  return [new TextRun({ text: text, size: fontSize, font: "Arial" })];
-}
-
-// Arial 9pt = 18 half-points
-const fontSize = 18;
-const scriptDir = path.dirname(process.argv[1]);
-const logoCombined = path.join(scriptDir, 'assets', 'datacenter-logo-black-type-transparent.png');
-
-const doc = new Document({
-  styles: {
-    default: {
-      document: {
-        run: { font: "Arial", size: fontSize }
-      }
-    }
-  },
-  sections: [{
-    properties: {
-      page: {
-        size: { width: 12240, height: 15840 },
-        margin: { top: 720, right: 720, bottom: 720, left: 720 }
-      }
-    },
-    children: [
-      // Logo - larger size
-      new Paragraph({
-        children: [
-          new ImageRun({
-            type: "png",
-            data: fs.readFileSync(logoCombined),
-            transformation: { width: 220, height: 72 },
-            altText: { title: "Logo", description: "Data Center TALNT Logo", name: "Logo" }
-          })
-        ],
-        spacing: { after: 200 }
-      }),
-      
-      // Name - CENTERED
-      new Paragraph({
-        children: [new TextRun({ text: data.name || "Name", size: fontSize, font: "Arial" })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 200 }
-      }),
-      
-      // Professional Summary HEADER
-      new Paragraph({
-        children: [new TextRun({ text: "Professional Summary", bold: true, underline: {}, size: fontSize, font: "Arial" })],
-        spacing: { after: 120 }
-      }),
-
-      // Professional Summary TEXT
-      new Paragraph({
-        children: highlightText(data.summary || ""),
-        spacing: { after: 200 }
-      }),
-
-      // Education HEADER
-      new Paragraph({
-        children: [new TextRun({ text: "Education", bold: true, underline: {}, size: fontSize, font: "Arial" })],
-        spacing: { after: 120 }
-      }),
-      
-      // Education entries - all on one line with spaces
-      new Paragraph({
-        children: (data.education || []).flatMap((edu, idx) => {
-          const parts = [];
-          if (idx > 0) parts.push(new TextRun({ text: " ", size: fontSize, font: "Arial" }));
-          
-          if (edu.degree && edu.school) {
-            parts.push(new TextRun({ text: edu.degree, bold: true, size: fontSize, font: "Arial" }));
-            parts.push(new TextRun({ text: " – ", size: fontSize, font: "Arial" }));
-            parts.push(new TextRun({ text: edu.school, size: fontSize, font: "Arial" }));
-            if (edu.year) {
-              parts.push(new TextRun({ text: ", " + edu.year, size: fontSize, font: "Arial" }));
-            }
-          } else if (edu.school) {
-            parts.push(new TextRun({ text: edu.school, size: fontSize, font: "Arial" }));
-          }
-          
-          return parts;
-        }),
-        spacing: { after: 200 }
-      }),
-      
-      // Employment History HEADER
-      new Paragraph({
-        children: [new TextRun({ text: "Employment History", bold: true, underline: {}, size: fontSize, font: "Arial" })],
-        spacing: { after: 120 }
-      }),
-      
-      // Experience entries
-      ...(data.experience || []).flatMap(exp => {
-        const elements = [];
-        
-        // Company | Title | Location | Dates (skip empty location)
-        const headerParts = [
-          new TextRun({ text: exp.company || '', bold: true, size: fontSize, font: "Arial" }),
-          new TextRun({ text: " | ", size: fontSize, font: "Arial" }),
-          new TextRun({ text: exp.title || '', bold: true, size: fontSize, font: "Arial" })
-        ];
-        // Only add location if it exists
-        if (exp.location && exp.location.trim()) {
-          headerParts.push(new TextRun({ text: " | ", size: fontSize, font: "Arial" }));
-          headerParts.push(new TextRun({ text: exp.location, size: fontSize, font: "Arial" }));
-        }
-        // Add dates
-        headerParts.push(new TextRun({ text: " | ", size: fontSize, font: "Arial" }));
-        headerParts.push(new TextRun({ text: exp.dates || '', size: fontSize, font: "Arial" }));
-
-        elements.push(
-          new Paragraph({
-            children: headerParts,
-            spacing: { after: 80 }
-          })
-        );
-        
-        // Projects line if exists (italicized)
-        if (exp.project_details) {
-          elements.push(
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Projects: ", italics: true, size: fontSize, font: "Arial" }),
-                ...highlightText(exp.project_details, fontSize).map(run => 
-                  new TextRun({ ...run, italics: true, font: "Arial" })
-                )
-              ],
-              spacing: { after: 80 }
-            })
-          );
-        }
-        
-        // Bullets - using proper Word indentation
-        (exp.bullets || []).forEach((bullet, idx) => {
-          // Remove any existing bullet characters
-          const cleanBullet = bullet.replace(/^[•●\-\*]\s*/, '');
-
-          elements.push(
-            new Paragraph({
-              children: [
-                new TextRun({ text: "• ", size: fontSize, font: "Arial" }),
-                ...highlightText(cleanBullet, fontSize)
-              ],
-              indent: {
-                left: convertInchesToTwip(0.25),
-                hanging: convertInchesToTwip(0.125)
-              },
-              spacing: { after: idx === exp.bullets.length - 1 ? 200 : 60 }
-            })
-          );
-        });
-        
-        return elements;
-      }),
-      
-      // Certifications (if exists)
-      ...(data.certifications && data.certifications.length > 0 ? [
-        new Paragraph({
-          children: [new TextRun({ text: "Certifications", bold: true, underline: {}, size: fontSize, font: "Arial" })],
-          spacing: { after: 120 }
-        }),
-        ...data.certifications.map((cert, idx) =>
-          new Paragraph({
-            children: [new TextRun({ text: cert, size: fontSize, font: "Arial" })],
-            spacing: { after: idx === data.certifications.length - 1 ? 200 : 60 }
-          })
-        )
-      ] : []),
-      
-      // Technical Tools (if exists)
-      ...(data.skills ? [
-        new Paragraph({
-          children: [new TextRun({ text: "Technical Tools", bold: true, underline: {}, size: fontSize, font: "Arial" })],
-          spacing: { after: 120 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: data.skills, size: fontSize, font: "Arial" })],
-          spacing: { after: 120 }
-        })
-      ] : [])
-    ]
-  }]
-});
-
-Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync(outputPath, buffer);
-  console.log("Resume formatted successfully!");
-});
-"""
-    
-    with open(node_script, 'w') as f:
-        f.write(node_code)
-    
-    # Run Node.js script
+    # Run Node.js script - the script reads TALNT_BRAND from environment
     try:
         result = subprocess.run(
             ['node', str(node_script), str(json_path), str(output_path)],
