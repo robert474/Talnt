@@ -863,21 +863,14 @@ def format_resume(input_path):
     print(f"✓ Extracted {len(text)} characters\n")
 
     # Step 2: Parse resume
-    # Use Claude API for PDFs (better handling of complex layouts)
-    # Use simple parser for DOCX (more reliable text extraction)
-    is_pdf = input_path.suffix.lower() == '.pdf'
-
-    if is_pdf and ANTHROPIC_API_KEY:
-        print("Step 2: Parsing PDF with Claude AI...")
+    # Always use Claude API when available - handles any format intelligently
+    if ANTHROPIC_API_KEY:
+        print("Step 2: Parsing resume with Claude AI...")
         parsed_data = parse_resume_with_claude(text)
-    elif is_pdf and not ANTHROPIC_API_KEY:
-        print("Step 2: Parsing PDF...")
-        print("⚠ Warning: PDF parsing works best with Claude API.")
-        print("  Set ANTHROPIC_API_KEY for better PDF results.")
-        print("  Using simple parser (may have issues with complex layouts)...\n")
-        parsed_data = simple_parse_resume(text)
     else:
-        print("Step 2: Parsing DOCX...")
+        print("Step 2: Parsing resume...")
+        print("⚠ Warning: No API key. Using simple parser (may have format issues).")
+        print("  Set ANTHROPIC_API_KEY for better results.\n")
         parsed_data = simple_parse_resume(text)
     
     if not parsed_data:
