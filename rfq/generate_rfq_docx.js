@@ -1,4 +1,4 @@
-const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, ImageRun, convertInchesToTwip } = require('docx');
+const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, ImageRun, convertInchesToTwip, ShadingType, VerticalAlign } = require('docx');
 const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
@@ -27,156 +27,149 @@ if (brand === 'tt') {
 // Font settings
 const fontSize = 20; // 10pt = 20 half-points
 const headerFontSize = 24; // 12pt
+const smallFontSize = 18; // 9pt for table
 
-// Table cell borders
+// Colors
+const primaryColor = "1a1a2e";  // Dark navy
+const accentColor = "2e7d32";   // Green for totals
+const lightGray = "f5f5f5";
+const mediumGray = "e0e0e0";
+
+// Table cell borders - cleaner look
 const tableBorders = {
-  top: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
-  bottom: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
-  left: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
-  right: { style: BorderStyle.SINGLE, size: 1, color: "000000" }
+  top: { style: BorderStyle.SINGLE, size: 1, color: mediumGray },
+  bottom: { style: BorderStyle.SINGLE, size: 1, color: mediumGray },
+  left: { style: BorderStyle.SINGLE, size: 1, color: mediumGray },
+  right: { style: BorderStyle.SINGLE, size: 1, color: mediumGray }
 };
 
-// Helper to create table cell
-function cell(text, isHeader = false, width = null) {
+const noBorders = {
+  top: { style: BorderStyle.NONE },
+  bottom: { style: BorderStyle.NONE },
+  left: { style: BorderStyle.NONE },
+  right: { style: BorderStyle.NONE }
+};
+
+// Helper to create styled table cell
+function styledCell(text, options = {}) {
+  const {
+    isHeader = false,
+    width = null,
+    align = AlignmentType.LEFT,
+    bgColor = null,
+    textColor = "000000",
+    bold = false,
+    fontSize: cellFontSize = smallFontSize
+  } = options;
+
   const cellOptions = {
     children: [
       new Paragraph({
         children: [
           new TextRun({
             text: text || '',
-            bold: isHeader,
-            size: fontSize,
-            font: "Arial"
+            bold: isHeader || bold,
+            size: cellFontSize,
+            font: "Arial",
+            color: textColor
           })
-        ]
+        ],
+        alignment: align
       })
     ],
-    borders: tableBorders
+    borders: tableBorders,
+    verticalAlign: VerticalAlign.CENTER
   };
 
   if (width) {
     cellOptions.width = { size: width, type: WidthType.PERCENTAGE };
   }
 
+  if (bgColor) {
+    cellOptions.shading = { fill: bgColor, type: ShadingType.CLEAR };
+  }
+
   return new TableCell(cellOptions);
 }
 
-// Create Staff Table
-function createStaffTable() {
+// Create Summary Grid Table (the main visual grid)
+function createSummaryGrid() {
+  const duration = data.duration.toString().includes('Month') ? data.duration : data.duration + ' mo';
+  const rate = data.hourly_rate.toString().includes('$') ? data.hourly_rate : '$' + data.hourly_rate + '/hr';
+  const hasExpenses = data.expense_monthly && data.expense_monthly !== 'N/A' && data.expense_monthly !== '$0';
+
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [
-      // Header row
+      // Header row - dark background
       new TableRow({
         children: [
-          cell("Staff Name", true, 18),
-          cell("Position", true, 18),
-          cell("Duration", true, 12),
-          cell("Hourly Rate", true, 12),
-          cell("Commitment", true, 12),
-          cell("Monthly", true, 14),
-          cell("Total", true, 14)
+          styledCell("Type", { isHeader: true, width: 12, bgColor: primaryColor, textColor: "FFFFFF", align: AlignmentType.CENTER }),
+          styledCell("Name/Description", { isHeader: true, width: 22, bgColor: primaryColor, textColor: "FFFFFF" }),
+          styledCell("Position", { isHeader: true, width: 18, bgColor: primaryColor, textColor: "FFFFFF" }),
+          styledCell("Duration", { isHeader: true, width: 10, bgColor: primaryColor, textColor: "FFFFFF", align: AlignmentType.CENTER }),
+          styledCell("Rate", { isHeader: true, width: 10, bgColor: primaryColor, textColor: "FFFFFF", align: AlignmentType.CENTER }),
+          styledCell("Monthly", { isHeader: true, width: 14, bgColor: primaryColor, textColor: "FFFFFF", align: AlignmentType.RIGHT }),
+          styledCell("Total", { isHeader: true, width: 14, bgColor: primaryColor, textColor: "FFFFFF", align: AlignmentType.RIGHT })
         ]
       }),
-      // Data row
+      // Staff row
       new TableRow({
         children: [
-          cell(data.staff_name),
-          cell(data.position),
-          cell(data.duration.toString().includes('Month') ? data.duration : data.duration + ' Months'),
-          cell(data.hourly_rate.toString().includes('$') ? data.hourly_rate : '$' + data.hourly_rate + '/hr'),
-          cell(data.commitment.toString().includes('%') ? data.commitment : data.commitment + '%'),
-          cell(data.staff_monthly),
-          cell(data.staff_total)
+          styledCell("Staff", { width: 12, bold: true, align: AlignmentType.CENTER }),
+          styledCell(data.staff_name, { width: 22 }),
+          styledCell(data.position, { width: 18 }),
+          styledCell(duration, { width: 10, align: AlignmentType.CENTER }),
+          styledCell(rate, { width: 10, align: AlignmentType.CENTER }),
+          styledCell(data.staff_monthly, { width: 14, align: AlignmentType.RIGHT, textColor: accentColor }),
+          styledCell(data.staff_total, { width: 14, align: AlignmentType.RIGHT, textColor: accentColor })
+        ]
+      }),
+      // Expenses row
+      new TableRow({
+        children: [
+          styledCell("Expenses", { width: 12, bold: true, align: AlignmentType.CENTER }),
+          styledCell(hasExpenses ? (data.expense_type || data.expense_desc || '-') : '-', { width: 22 }),
+          styledCell("-", { width: 18 }),
+          styledCell(hasExpenses ? duration : '-', { width: 10, align: AlignmentType.CENTER }),
+          styledCell("-", { width: 10, align: AlignmentType.CENTER }),
+          styledCell(hasExpenses ? data.expense_monthly : '$0', { width: 14, align: AlignmentType.RIGHT }),
+          styledCell(hasExpenses ? data.expense_total : '$0', { width: 14, align: AlignmentType.RIGHT })
+        ]
+      }),
+      // Combined row - highlighted
+      new TableRow({
+        children: [
+          styledCell("COMBINED", { width: 12, bold: true, bgColor: "e8f5e9", align: AlignmentType.CENTER }),
+          styledCell("", { width: 22, bgColor: "e8f5e9" }),
+          styledCell("", { width: 18, bgColor: "e8f5e9" }),
+          styledCell("", { width: 10, bgColor: "e8f5e9" }),
+          styledCell("", { width: 10, bgColor: "e8f5e9" }),
+          styledCell(data.combined_monthly, { width: 14, align: AlignmentType.RIGHT, bgColor: "e8f5e9", bold: true, textColor: accentColor }),
+          styledCell(data.combined_total, { width: 14, align: AlignmentType.RIGHT, bgColor: "e8f5e9", bold: true, textColor: "1b5e20", fontSize: 22 })
         ]
       })
     ]
   });
 }
 
-// Create Expenses Table
-function createExpensesTable() {
-  const duration = data.duration.toString().includes('Month') ? data.duration : data.duration + ' Months';
-
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [
-      new TableRow({
-        children: [
-          cell("Expenses", true, 18),
-          cell("Description", true, 18),
-          cell("Duration", true, 12),
-          cell("Hourly Rate", true, 12),
-          cell("Commitment", true, 12),
-          cell("Monthly", true, 14),
-          cell("Total", true, 14)
-        ]
-      }),
-      new TableRow({
-        children: [
-          cell(data.expense_type || ""),
-          cell(data.expense_desc || "N/A"),
-          cell(data.expense_desc === "N/A" ? "" : duration),
-          cell(""),
-          cell(""),
-          cell(data.expense_monthly || "N/A"),
-          cell(data.expense_total || "N/A")
-        ]
-      })
-    ]
-  });
-}
-
-// Create Combined Table
-function createCombinedTable() {
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [
-      new TableRow({
-        children: [
-          cell("Combined", true, 18),
-          cell("Description", true, 18),
-          cell("Duration", true, 12),
-          cell("Hourly Rate", true, 12),
-          cell("Commitment", true, 12),
-          cell("Monthly Total", true, 14),
-          cell("Project Total", true, 14)
-        ]
-      }),
-      new TableRow({
-        children: [
-          cell(""),
-          cell(""),
-          cell(""),
-          cell(""),
-          cell(""),
-          cell(data.combined_monthly),
-          cell(data.combined_total)
-        ]
-      })
-    ]
-  });
-}
-
-// Split project summary into properly formatted paragraphs (not using broken bullet system)
+// Split project summary into properly formatted paragraphs
 function createProjectSummaryParagraphs() {
   if (!data.project_summary) return [];
 
   const lines = data.project_summary.split('\n').filter(line => line.trim());
   return lines.map(line => {
-    // Remove existing bullet markers
     let cleanLine = line.replace(/^[-•*●]\s*/, '').trim();
 
     return new Paragraph({
       children: [
-        new TextRun({ text: "• ", size: fontSize, font: "Arial" }),
+        new TextRun({ text: "  •  ", size: fontSize, font: "Arial", color: accentColor }),
         new TextRun({ text: cleanLine, size: fontSize, font: "Arial" })
       ],
       indent: {
-        left: convertInchesToTwip(0.25),
-        hanging: convertInchesToTwip(0.25)
+        left: convertInchesToTwip(0.25)
       },
-      spacing: { after: 100 }
+      spacing: { after: 120 }
     });
   });
 }
@@ -187,35 +180,25 @@ function extractResumeContent() {
     return [
       new Paragraph({
         children: [
-          new TextRun({ text: "<Resume not provided>", italics: true, size: fontSize, font: "Arial" })
+          new TextRun({ text: "<Resume not provided>", italics: true, size: fontSize, font: "Arial", color: "666666" })
         ]
       })
     ];
   }
 
   try {
-    // Read the DOCX file (it's a ZIP)
     const zip = new AdmZip(data.formatted_resume_path);
     const documentXml = zip.readAsText('word/document.xml');
 
-    // Parse XML and extract text
     const paragraphs = [];
-    let currentText = '';
-    let isBold = false;
-    let isUnderline = false;
-
-    // Simple regex-based extraction of text from DOCX XML
     const textMatches = documentXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
     const paraMatches = documentXml.split(/<\/w:p>/);
 
     paraMatches.forEach(paraXml => {
-      // Check for paragraph properties
       const texts = paraXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
       if (texts.length === 0) return;
 
       const runs = [];
-
-      // Extract runs with formatting
       const runMatches = paraXml.match(/<w:r>[\s\S]*?<\/w:r>/g) || [];
       runMatches.forEach(runXml => {
         const textMatch = runXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/);
@@ -245,7 +228,6 @@ function extractResumeContent() {
     });
 
     if (paragraphs.length === 0) {
-      // Fallback: simple text extraction
       const allText = textMatches.map(m => m.replace(/<[^>]+>/g, '')).join(' ');
       return [
         new Paragraph({
@@ -298,33 +280,42 @@ const children = [
         altText: { title: "Logo", description: brand === 'tt' ? "Talnt Team Logo" : "Data Center TALNT Logo", name: "Logo" }
       })
     ],
-    spacing: { after: 300 }
+    spacing: { after: 400 }
   }),
 
-  // TL;DR Summary Header
+  // Title
   new Paragraph({
     children: [
       new TextRun({
-        text: `PROJECT TOTAL: ${data.combined_total}`,
+        text: "RFQ PROPOSAL",
         bold: true,
-        size: 32, // 16pt
-        font: "Arial"
+        size: 36,
+        font: "Arial",
+        color: primaryColor
       })
     ],
     alignment: AlignmentType.CENTER,
     spacing: { after: 100 }
   }),
 
+  // Candidate name and position
   new Paragraph({
     children: [
       new TextRun({
-        text: `${data.staff_name} | ${data.position} | ${data.duration} Months @ $${data.hourly_rate}/hr`,
-        size: fontSize,
+        text: data.staff_name,
+        bold: true,
+        size: 28,
         font: "Arial"
+      }),
+      new TextRun({
+        text: `  |  ${data.position}`,
+        size: 24,
+        font: "Arial",
+        color: "666666"
       })
     ],
     alignment: AlignmentType.CENTER,
-    spacing: { after: dateRange ? 100 : 400 }
+    spacing: { after: 80 }
   }),
 
   // Project Dates (if provided)
@@ -334,18 +325,28 @@ const children = [
         text: dateRange,
         size: fontSize,
         font: "Arial",
-        italics: true
+        italics: true,
+        color: "666666"
       })
     ],
     alignment: AlignmentType.CENTER,
-    spacing: { after: 400 }
-  })] : []),
+    spacing: { after: 300 }
+  })] : [new Paragraph({ children: [], spacing: { after: 200 } })]),
+
+  // Summary Grid Table
+  createSummaryGrid(),
+
+  // Spacing after grid
+  new Paragraph({ children: [], spacing: { after: 400 } }),
 
   // Detailed Project Experience Header
   new Paragraph({
     children: [
-      new TextRun({ text: "Detailed Project Experience:", bold: true, underline: {}, size: headerFontSize, font: "Arial" })
+      new TextRun({ text: "DETAILED PROJECT EXPERIENCE", bold: true, size: headerFontSize, font: "Arial", color: primaryColor })
     ],
+    border: {
+      bottom: { style: BorderStyle.SINGLE, size: 12, color: primaryColor }
+    },
     spacing: { after: 200 }
   }),
 
@@ -360,31 +361,16 @@ const children = [
   // Project Summary Header
   new Paragraph({
     children: [
-      new TextRun({ text: "Project Summary:", bold: true, underline: {}, size: headerFontSize, font: "Arial" })
+      new TextRun({ text: "PROJECT SUMMARY", bold: true, size: headerFontSize, font: "Arial", color: primaryColor })
     ],
+    border: {
+      bottom: { style: BorderStyle.SINGLE, size: 12, color: primaryColor }
+    },
     spacing: { after: 200 }
   }),
 
   // Project Summary Bullets
   ...createProjectSummaryParagraphs(),
-
-  // Spacing before tables
-  new Paragraph({ children: [], spacing: { after: 300 } }),
-
-  // Staff Table
-  createStaffTable(),
-
-  // Spacing
-  new Paragraph({ children: [], spacing: { after: 200 } }),
-
-  // Expenses Table
-  createExpensesTable(),
-
-  // Spacing
-  new Paragraph({ children: [], spacing: { after: 200 } }),
-
-  // Combined Table
-  createCombinedTable(),
 
   // Page break before resume
   new Paragraph({
@@ -395,12 +381,15 @@ const children = [
   // Resume Header
   new Paragraph({
     children: [
-      new TextRun({ text: "Resume:", bold: true, underline: {}, size: headerFontSize, font: "Arial" })
+      new TextRun({ text: "RESUME", bold: true, size: headerFontSize, font: "Arial", color: primaryColor })
     ],
-    spacing: { after: 200 }
+    border: {
+      bottom: { style: BorderStyle.SINGLE, size: 12, color: primaryColor }
+    },
+    spacing: { after: 300 }
   }),
 
-  // Resume Content - now embedded
+  // Resume Content
   ...extractResumeContent()
 ];
 
@@ -415,8 +404,8 @@ const doc = new Document({
   sections: [{
     properties: {
       page: {
-        size: { width: 12240, height: 15840 }, // Letter size
-        margin: { top: 720, right: 720, bottom: 720, left: 720 } // 0.5 inch margins
+        size: { width: 12240, height: 15840 },
+        margin: { top: 720, right: 720, bottom: 720, left: 720 }
       }
     },
     children: children
