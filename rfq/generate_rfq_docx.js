@@ -10,7 +10,19 @@ const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
 const scriptDir = path.dirname(process.argv[1]);
 const parentDir = path.dirname(scriptDir);
-const logoPath = path.join(parentDir, 'assets', 'datacenter-logo-black-type-transparent.png');
+
+// Select logo based on brand
+const brand = data.brand || 'dc';
+let logoPath, logoWidth, logoHeight;
+if (brand === 'tt') {
+  logoPath = path.join(parentDir, 'assets', 'TT-final-side.jpg');
+  logoWidth = 200;
+  logoHeight = 80;
+} else {
+  logoPath = path.join(parentDir, 'assets', 'datacenter-logo-black-type-transparent.png');
+  logoWidth = 220;
+  logoHeight = 72;
+}
 
 // Font settings
 const fontSize = 20; // 10pt = 20 half-points
@@ -263,16 +275,27 @@ function extractResumeContent() {
   }
 }
 
+// Format dates for display
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const startDateFormatted = formatDate(data.start_date);
+const endDateFormatted = formatDate(data.end_date);
+const dateRange = startDateFormatted && endDateFormatted ? `${startDateFormatted} - ${endDateFormatted}` : '';
+
 // Build the document
 const children = [
   // Logo
   new Paragraph({
     children: [
       new ImageRun({
-        type: "png",
+        type: brand === 'tt' ? "jpg" : "png",
         data: fs.readFileSync(logoPath),
-        transformation: { width: 220, height: 72 },
-        altText: { title: "Logo", description: "Data Center TALNT Logo", name: "Logo" }
+        transformation: { width: logoWidth, height: logoHeight },
+        altText: { title: "Logo", description: brand === 'tt' ? "Talnt Team Logo" : "Data Center TALNT Logo", name: "Logo" }
       })
     ],
     spacing: { after: 300 }
@@ -301,8 +324,22 @@ const children = [
       })
     ],
     alignment: AlignmentType.CENTER,
-    spacing: { after: 400 }
+    spacing: { after: dateRange ? 100 : 400 }
   }),
+
+  // Project Dates (if provided)
+  ...(dateRange ? [new Paragraph({
+    children: [
+      new TextRun({
+        text: dateRange,
+        size: fontSize,
+        font: "Arial",
+        italics: true
+      })
+    ],
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 400 }
+  })] : []),
 
   // Detailed Project Experience Header
   new Paragraph({

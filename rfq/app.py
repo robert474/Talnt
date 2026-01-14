@@ -35,7 +35,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def format_resume_file(input_path):
+def format_resume_file(input_path, brand='dc'):
     """Run the resume formatter on a file and return the output path."""
     format_script = PARENT_DIR / "format_resume.py"
     input_folder = PARENT_DIR / "input"
@@ -48,13 +48,18 @@ def format_resume_file(input_path):
 
     shutil.copy(input_path, input_folder / input_path.name)
 
+    # Set brand environment variable for the formatter
+    env = os.environ.copy()
+    env['TALNT_BRAND'] = brand
+
     # Run the formatter
     result = subprocess.run(
         ['python3', str(format_script)],
         capture_output=True,
         text=True,
         cwd=str(PARENT_DIR),
-        timeout=120  # 2 minute timeout
+        timeout=120,  # 2 minute timeout
+        env=env
     )
 
     if result.returncode != 0:
@@ -101,13 +106,16 @@ def format_resume():
         if not allowed_file(file.filename):
             return jsonify({'error': 'Invalid file type. Please upload PDF or DOCX'}), 400
 
+        # Get brand selection
+        brand = request.form.get('brand', 'dc')
+
         # Save uploaded file
         filename = secure_filename(file.filename)
         upload_path = app.config['UPLOAD_FOLDER'] / filename
         file.save(str(upload_path))
 
-        # Format the resume
-        formatted_path = format_resume_file(upload_path)
+        # Format the resume with selected brand
+        formatted_path = format_resume_file(upload_path, brand=brand)
 
         # Return the formatted file
         return send_file(
@@ -150,6 +158,11 @@ def generate():
         hourly_rate = request.form.get('hourly_rate', '')
         commitment = request.form.get('commitment', '100')
 
+        # Brand and dates
+        brand = request.form.get('brand', 'dc')
+        start_date = request.form.get('start_date', '')
+        end_date = request.form.get('end_date', '')
+
         # Project details
         project_experience = request.form.get('project_experience', '')
         project_summary = request.form.get('project_summary', '')
@@ -191,9 +204,9 @@ def generate():
                 resume_path = app.config['UPLOAD_FOLDER'] / filename
                 file.save(str(resume_path))
 
-                # Format the resume
+                # Format the resume with selected brand
                 try:
-                    formatted_resume_path = format_resume_file(resume_path)
+                    formatted_resume_path = format_resume_file(resume_path, brand=brand)
                 except Exception as e:
                     print(f"Resume formatting error: {e}")
 
@@ -223,7 +236,10 @@ def generate():
             'expense_total': f"${expense_total_val:,.0f}" if expense_total_val > 0 else 'N/A',
             'combined_monthly': f"${combined_monthly:,.0f}",
             'combined_total': f"${combined_total:,.0f}",
-            'formatted_resume_path': str(formatted_resume_path) if formatted_resume_path else None
+            'formatted_resume_path': str(formatted_resume_path) if formatted_resume_path else None,
+            'brand': brand,
+            'start_date': start_date,
+            'end_date': end_date
         }
 
         generate_rfq_proposal(proposal_data, str(output_path))

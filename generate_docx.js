@@ -39,7 +39,19 @@ function highlightText(text, fontSize = 18) {
 // Arial 9pt = 18 half-points
 const fontSize = 18;
 const scriptDir = path.dirname(process.argv[1]);
-const logoCombined = path.join(scriptDir, 'assets', 'datacenter-logo-black-type-transparent.png');
+
+// Select logo based on brand environment variable
+const brand = process.env.TALNT_BRAND || 'dc';
+let logoPath, logoWidth, logoHeight;
+if (brand === 'tt') {
+  logoPath = path.join(scriptDir, 'assets', 'TT-final-side.jpg');
+  logoWidth = 180;
+  logoHeight = 72;
+} else {
+  logoPath = path.join(scriptDir, 'assets', 'datacenter-logo-black-type-transparent.png');
+  logoWidth = 200;
+  logoHeight = 65;
+}
 
 const doc = new Document({
   styles: {
@@ -57,14 +69,14 @@ const doc = new Document({
       }
     },
     children: [
-      // Logo - larger size
+      // Logo - uses brand selection
       new Paragraph({
         children: [
           new ImageRun({
-            type: "png",
-            data: fs.readFileSync(logoCombined),
-            transformation: { width: 220, height: 72 },
-            altText: { title: "Logo", description: "Data Center TALNT Logo", name: "Logo" }
+            type: brand === 'tt' ? "jpg" : "png",
+            data: fs.readFileSync(logoPath),
+            transformation: { width: logoWidth, height: logoHeight },
+            altText: { title: "Logo", description: brand === 'tt' ? "Talnt Team Logo" : "Data Center TALNT Logo", name: "Logo" }
           })
         ],
         spacing: { after: 200 }

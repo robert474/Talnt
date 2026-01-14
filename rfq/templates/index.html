@@ -48,7 +48,21 @@
             margin-top: 20px;
         }
 
-        .mode-btn {
+        .brand-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .brand-selector-label {
+            opacity: 0.7;
+            font-size: 0.9rem;
+            margin-right: 10px;
+            align-self: center;
+        }
+
+        .mode-btn, .brand-btn {
             padding: 12px 30px;
             border: 2px solid rgba(255,255,255,0.3);
             background: transparent;
@@ -59,11 +73,16 @@
             transition: all 0.2s;
         }
 
-        .mode-btn:hover {
+        .brand-btn {
+            padding: 8px 20px;
+            font-size: 0.9rem;
+        }
+
+        .mode-btn:hover, .brand-btn:hover {
             background: rgba(255,255,255,0.1);
         }
 
-        .mode-btn.active {
+        .mode-btn.active, .brand-btn.active {
             background: white;
             color: #1a1a2e;
             border-color: white;
@@ -199,25 +218,6 @@
             transform: none;
         }
 
-        .tl-dr {
-            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-            border-left: 4px solid #2e7d32;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 0 8px 8px 0;
-        }
-
-        .tl-dr h3 {
-            color: #2e7d32;
-            margin-bottom: 10px;
-        }
-
-        .tl-dr .amount {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #1b5e20;
-        }
-
         .loading {
             display: none;
             text-align: center;
@@ -263,6 +263,51 @@
         .resume-info p {
             color: #555;
         }
+
+        /* Grid Summary Table */
+        .summary-grid {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .summary-grid table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .summary-grid th {
+            background: #1a1a2e;
+            color: white;
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .summary-grid td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .summary-grid tr:last-child td {
+            border-bottom: none;
+            background: #e8f5e9;
+            font-weight: 600;
+        }
+
+        .summary-grid .amount {
+            text-align: right;
+            color: #2e7d32;
+            font-weight: 600;
+        }
+
+        .summary-grid tr:last-child .amount {
+            color: #1b5e20;
+            font-size: 1.1rem;
+        }
     </style>
 </head>
 <body>
@@ -273,6 +318,11 @@
             <button type="button" class="mode-btn" id="mode-resume" onclick="setMode('resume')">Resume Formatter</button>
             <button type="button" class="mode-btn active" id="mode-rfq" onclick="setMode('rfq')">RFQ Proposal</button>
         </div>
+        <div class="brand-selector">
+            <span class="brand-selector-label">Brand:</span>
+            <button type="button" class="brand-btn active" id="brand-dc" onclick="setBrand('dc')">DC Talnt</button>
+            <button type="button" class="brand-btn" id="brand-tt" onclick="setBrand('tt')">Talnt Team</button>
+        </div>
     </header>
 
     <div class="container">
@@ -282,15 +332,55 @@
             <p>Upload a resume (PDF or DOCX) to format it with company branding, keyword highlighting, and standardized layout.</p>
         </div>
 
-        <!-- RFQ Project Total banner -->
-        <div class="tl-dr" id="rfq-banner">
-            <h3>Project Total</h3>
-            <div class="amount" id="tldr-total">$0</div>
-            <p id="tldr-summary">Fill in the form below to calculate</p>
+        <!-- RFQ Summary Grid Table -->
+        <div class="summary-grid" id="summary-grid">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Name/Description</th>
+                        <th>Position</th>
+                        <th>Duration</th>
+                        <th>Rate</th>
+                        <th class="amount">Monthly</th>
+                        <th class="amount">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr id="staff-row">
+                        <td>Staff</td>
+                        <td id="grid-name">-</td>
+                        <td id="grid-position">-</td>
+                        <td id="grid-duration">-</td>
+                        <td id="grid-rate">-</td>
+                        <td class="amount" id="grid-staff-monthly">$0</td>
+                        <td class="amount" id="grid-staff-total">$0</td>
+                    </tr>
+                    <tr id="expense-row">
+                        <td>Expenses</td>
+                        <td id="grid-expense-desc">-</td>
+                        <td>-</td>
+                        <td id="grid-expense-duration">-</td>
+                        <td>-</td>
+                        <td class="amount" id="grid-expense-monthly">$0</td>
+                        <td class="amount" id="grid-expense-total">$0</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Combined</strong></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td class="amount" id="grid-combined-monthly">$0</td>
+                        <td class="amount" id="grid-combined-total">$0</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <!-- Resume-only form -->
         <form id="resume-form" action="/format-resume" method="POST" enctype="multipart/form-data" class="hidden">
+            <input type="hidden" id="resume-brand" name="brand" value="dc">
             <div class="card">
                 <h2>Upload Resume</h2>
                 <div class="file-upload" id="resume-file-upload">
@@ -313,6 +403,8 @@
 
         <!-- RFQ Proposal form -->
         <form id="rfq-form" action="/generate" method="POST" enctype="multipart/form-data">
+            <input type="hidden" id="rfq-brand" name="brand" value="dc">
+
             <!-- Staff Information -->
             <div class="card">
                 <h2>Staff Information</h2>
@@ -328,6 +420,16 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
+                        <label for="start_date">Start Date *</label>
+                        <input type="date" id="start_date" name="start_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="end_date">End Date *</label>
+                        <input type="date" id="end_date" name="end_date" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
                         <label for="duration">Duration (Months) *</label>
                         <input type="number" id="duration" name="duration" required placeholder="e.g., 12" step="0.5" min="0.5">
                     </div>
@@ -338,17 +440,6 @@
                     <div class="form-group">
                         <label for="commitment">Commitment (%)</label>
                         <input type="number" id="commitment" name="commitment" value="100" min="0" max="100">
-                    </div>
-                </div>
-
-                <div class="totals-preview">
-                    <div class="totals-row">
-                        <span>Monthly Cost</span>
-                        <span class="totals-value" id="monthly-cost">$0</span>
-                    </div>
-                    <div class="totals-row">
-                        <span>Project Total</span>
-                        <span class="totals-value" id="project-total">$0</span>
                     </div>
                 </div>
             </div>
@@ -392,16 +483,6 @@
                         <input type="number" id="expense_monthly_amt" name="expense_monthly_amt" placeholder="e.g., 2520" min="0">
                     </div>
                 </div>
-                <div class="totals-preview" id="expense-totals" style="display: none;">
-                    <div class="totals-row">
-                        <span>Expense Monthly</span>
-                        <span class="totals-value" id="expense-monthly-display">$0</span>
-                    </div>
-                    <div class="totals-row">
-                        <span>Expense Total</span>
-                        <span class="totals-value" id="expense-total-display">$0</span>
-                    </div>
-                </div>
                 <input type="hidden" id="expense_monthly" name="expense_monthly" value="N/A">
                 <input type="hidden" id="expense_total" name="expense_total" value="N/A">
             </div>
@@ -431,12 +512,13 @@
 
     <script>
         let currentMode = 'rfq';
+        let currentBrand = 'dc';
 
         function setMode(mode) {
             currentMode = mode;
             const rfqForm = document.getElementById('rfq-form');
             const resumeForm = document.getElementById('resume-form');
-            const rfqBanner = document.getElementById('rfq-banner');
+            const summaryGrid = document.getElementById('summary-grid');
             const resumeInfo = document.getElementById('resume-info');
             const modeRfq = document.getElementById('mode-rfq');
             const modeResume = document.getElementById('mode-resume');
@@ -445,7 +527,7 @@
             if (mode === 'resume') {
                 rfqForm.classList.add('hidden');
                 resumeForm.classList.remove('hidden');
-                rfqBanner.classList.add('hidden');
+                summaryGrid.classList.add('hidden');
                 resumeInfo.classList.remove('hidden');
                 modeRfq.classList.remove('active');
                 modeResume.classList.add('active');
@@ -453,13 +535,42 @@
             } else {
                 rfqForm.classList.remove('hidden');
                 resumeForm.classList.add('hidden');
-                rfqBanner.classList.remove('hidden');
+                summaryGrid.classList.remove('hidden');
                 resumeInfo.classList.add('hidden');
                 modeRfq.classList.add('active');
                 modeResume.classList.remove('active');
                 subtitle.textContent = 'Create formatted proposals with pricing and resumes';
             }
         }
+
+        function setBrand(brand) {
+            currentBrand = brand;
+            document.getElementById('brand-dc').classList.toggle('active', brand === 'dc');
+            document.getElementById('brand-tt').classList.toggle('active', brand === 'tt');
+            document.getElementById('rfq-brand').value = brand;
+            document.getElementById('resume-brand').value = brand;
+        }
+
+        // Auto-calculate duration from dates
+        const startDate = document.getElementById('start_date');
+        const endDate = document.getElementById('end_date');
+        const durationInput = document.getElementById('duration');
+
+        function calculateDurationFromDates() {
+            if (startDate.value && endDate.value) {
+                const start = new Date(startDate.value);
+                const end = new Date(endDate.value);
+                const diffTime = end - start;
+                const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44);
+                if (diffMonths > 0) {
+                    durationInput.value = Math.round(diffMonths * 2) / 2; // Round to 0.5
+                    calculateTotals();
+                }
+            }
+        }
+
+        startDate.addEventListener('change', calculateDurationFromDates);
+        endDate.addEventListener('change', calculateDurationFromDates);
 
         // Resume-only file upload handling
         const resumeFileUpload = document.getElementById('resume-file-upload');
@@ -542,25 +653,33 @@
             }
         }
 
-        // Calculate totals
+        // Calculate totals and update grid
         const hourlyRate = document.getElementById('hourly_rate');
         const duration = document.getElementById('duration');
         const commitment = document.getElementById('commitment');
-        const monthlyDisplay = document.getElementById('monthly-cost');
-        const totalDisplay = document.getElementById('project-total');
-        const tldrTotal = document.getElementById('tldr-total');
-        const tldrSummary = document.getElementById('tldr-summary');
         const staffName = document.getElementById('staff_name');
         const position = document.getElementById('position');
 
         // Expense fields
         const expenseType = document.getElementById('expense_type');
+        const expenseDesc = document.getElementById('expense_desc');
         const expenseMonthlyAmt = document.getElementById('expense_monthly_amt');
-        const expenseTotalsDiv = document.getElementById('expense-totals');
-        const expenseMonthlyDisplay = document.getElementById('expense-monthly-display');
-        const expenseTotalDisplay = document.getElementById('expense-total-display');
         const expenseMonthlyHidden = document.getElementById('expense_monthly');
         const expenseTotalHidden = document.getElementById('expense_total');
+
+        // Grid elements
+        const gridName = document.getElementById('grid-name');
+        const gridPosition = document.getElementById('grid-position');
+        const gridDuration = document.getElementById('grid-duration');
+        const gridRate = document.getElementById('grid-rate');
+        const gridStaffMonthly = document.getElementById('grid-staff-monthly');
+        const gridStaffTotal = document.getElementById('grid-staff-total');
+        const gridExpenseDesc = document.getElementById('grid-expense-desc');
+        const gridExpenseDuration = document.getElementById('grid-expense-duration');
+        const gridExpenseMonthly = document.getElementById('grid-expense-monthly');
+        const gridExpenseTotal = document.getElementById('grid-expense-total');
+        const gridCombinedMonthly = document.getElementById('grid-combined-monthly');
+        const gridCombinedTotal = document.getElementById('grid-combined-total');
 
         function calculateTotals() {
             const hr = parseFloat(hourlyRate.value) || 0;
@@ -575,15 +694,11 @@
             const expMonthly = parseFloat(expenseMonthlyAmt.value) || 0;
             const expTotal = expMonthly * dur;
 
-            // Show/hide expense totals
+            // Update hidden expense fields
             if (expMonthly > 0) {
-                expenseTotalsDiv.style.display = 'block';
-                expenseMonthlyDisplay.textContent = '$' + expMonthly.toLocaleString('en-US', {maximumFractionDigits: 0});
-                expenseTotalDisplay.textContent = '$' + expTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
                 expenseMonthlyHidden.value = '$' + expMonthly.toLocaleString('en-US', {maximumFractionDigits: 0});
                 expenseTotalHidden.value = '$' + expTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
             } else {
-                expenseTotalsDiv.style.display = 'none';
                 expenseMonthlyHidden.value = 'N/A';
                 expenseTotalHidden.value = 'N/A';
             }
@@ -592,17 +707,24 @@
             const combinedMonthly = staffMonthly + expMonthly;
             const combinedTotal = staffTotal + expTotal;
 
-            monthlyDisplay.textContent = '$' + staffMonthly.toLocaleString('en-US', {maximumFractionDigits: 0});
-            totalDisplay.textContent = '$' + staffTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
-            tldrTotal.textContent = '$' + combinedTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
+            // Update grid display
+            gridName.textContent = staffName.value || '-';
+            gridPosition.textContent = position.value || '-';
+            gridDuration.textContent = dur ? dur + ' mo' : '-';
+            gridRate.textContent = hr ? '$' + hr + '/hr' : '-';
+            gridStaffMonthly.textContent = '$' + staffMonthly.toLocaleString('en-US', {maximumFractionDigits: 0});
+            gridStaffTotal.textContent = '$' + staffTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
 
-            const name = staffName.value || 'Candidate';
-            const pos = position.value || 'Position';
-            let summary = `${name} | ${pos} | ${dur || 0} months @ $${hr || 0}/hr`;
-            if (expMonthly > 0) {
-                summary += ` + $${expMonthly}/mo expenses`;
-            }
-            tldrSummary.textContent = summary;
+            // Update expense row
+            const expDescText = expenseType.value || expenseDesc.value || '-';
+            gridExpenseDesc.textContent = expMonthly > 0 ? expDescText : '-';
+            gridExpenseDuration.textContent = expMonthly > 0 && dur ? dur + ' mo' : '-';
+            gridExpenseMonthly.textContent = expMonthly > 0 ? '$' + expMonthly.toLocaleString('en-US', {maximumFractionDigits: 0}) : '$0';
+            gridExpenseTotal.textContent = expMonthly > 0 ? '$' + expTotal.toLocaleString('en-US', {maximumFractionDigits: 0}) : '$0';
+
+            // Update combined row
+            gridCombinedMonthly.textContent = '$' + combinedMonthly.toLocaleString('en-US', {maximumFractionDigits: 0});
+            gridCombinedTotal.textContent = '$' + combinedTotal.toLocaleString('en-US', {maximumFractionDigits: 0});
         }
 
         hourlyRate.addEventListener('input', calculateTotals);
@@ -612,6 +734,7 @@
         position.addEventListener('input', calculateTotals);
         expenseMonthlyAmt.addEventListener('input', calculateTotals);
         expenseType.addEventListener('change', calculateTotals);
+        expenseDesc.addEventListener('input', calculateTotals);
 
         // Form submission
         const form = document.getElementById('rfq-form');
